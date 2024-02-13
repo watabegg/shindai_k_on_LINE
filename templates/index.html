@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+        <meta charset="UTF-8">
+        <title>信大軽音コマ取り</title>
+        <script src="./getid.js"></script>
+        <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+        <script>
+            $(document).ready(function(){
+                liff.init({
+                    liffId: LIFF_ID
+                });
+                $('#btn-post').on('click', function(event){
+                event.preventDefault();
+                const accessToken = liff.getAccessToken();
+                console.log(accessToken);
+
+                var formData ={
+                    'accessToken':accessToken,
+                    'remark':$('#remark').val(),
+                    'name':$('input[name=name]').val(),
+                    'password':$('input[name=password]').val()
+                };
+                console.log(JSON.stringify(formData)); // 後で消す
+                $.ajax({
+                    type: 'POST',
+                    url: '/booking',
+                    data: JSON.stringify(formData),
+                    contentType: 'application/json',
+                    success: function(response) {
+                        console.log(response);
+                        alert('予約に成功しました');
+                    },
+                    error: function(error) {
+                        console.error(error);
+                        alert('予約に失敗しました');
+                    }
+                });
+                });
+            });
+        </script>
+    </head>
+    <body>
+
+        <h1>信大軽音 予約フォーム</h1>
+
+        <!-- 実際にCanvasが描画されるエリア -->
+        <div class="container">
+            <table>
+            <tr>
+                <td class="menu">備考：</td>
+                <td><textarea id="remark"></textarea></td>
+            </tr>
+            <tr>
+                <td class="menu">パスワード：</td>
+                <td><input type="password" name="password" required></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td><button id="btn-post" type="button">予約</td>
+            </tr>
+            </table>
+        </div>
+    </body>
+
+</html>

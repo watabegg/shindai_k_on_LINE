@@ -1,0 +1,1 @@
+const LIFF_ID = '{{value}}';
