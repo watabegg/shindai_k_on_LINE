@@ -68,6 +68,10 @@ def base():
 def csv():
     return render_template('/time.csv')
 
+@app.route('/part.csv')
+def part():
+    return render_template('/part.csv')
+
 # アプリにPOSTがあったときの処理
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -87,6 +91,7 @@ def callback():
 def booking():
     today = datetime.today()
     time = pandas.read_csv("./templates/time.csv", header=None).values.tolist() # バグるかも
+    part = pandas.read_csv("./templates/part.csv", header=None).values.tolist()
     data = request.json
     access_token = data['accessToken']
     
@@ -108,7 +113,14 @@ def booking():
         "messages": [
             {
                 "type": "text",
-                "text": f"予約内容\n日付:{data['day']}\n時間:{time[0][int(data['time'])]}\n予約者:{user_name}\n備考:{data['remark']}\nパスワード:{data['password']}"
+                "text": f"""予約内容
+日付:{data['day']}
+時間:{time[0][int(data['time'])]}
+登録名:{data['regist_name']}
+パート:{data['part']}
+予約者:{user_name}
+備考:{data['remark']}
+パスワード:{data['password']}"""
             }
         ]
     }
