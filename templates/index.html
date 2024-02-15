@@ -4,10 +4,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
         <meta charset="UTF-8">
         <title>信大軽音コマ取り</title>
-        <script src="./getid.js"></script>
+        <script src="./Source/getid.js"></script>
+        <script src="./Source/base.js"></script>
         <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
         <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.11/jquery.csv.min.js"></script>
 
         <script>
             $(document).ready(function(){
@@ -15,31 +17,32 @@
                     liffId: LIFF_ID
                 });
                 $('#btn-post').on('click', function(event){
-                event.preventDefault();
-                const accessToken = liff.getAccessToken();
-                console.log(accessToken);
+                    event.preventDefault();
+                    const accessToken = liff.getAccessToken();
+                    console.log(accessToken);
 
-                var formData ={
-                    'accessToken':accessToken,
-                    'remark':$('#remark').val(),
-                    'name':$('input[name=name]').val(),
-                    'password':$('input[name=password]').val()
-                };
-                console.log(JSON.stringify(formData)); // 後で消す
-                $.ajax({
-                    type: 'POST',
-                    url: '/booking',
-                    data: JSON.stringify(formData),
-                    contentType: 'application/json',
-                    success: function(response) {
-                        console.log(response);
-                        alert('予約に成功しました');
-                    },
-                    error: function(error) {
-                        console.error(error);
-                        alert('予約に失敗しました');
-                    }
-                });
+                    var formData ={
+                        'accessToken':accessToken,
+                        'day':$('#day').val(),
+                        'time':$('#time').val(),
+                        'remark':$('#remark').val(),
+                        'password':$('input[name=password]').val()
+                    };
+                    console.log(JSON.stringify(formData)); // 後で消す
+                    $.ajax({
+                        type: 'POST',
+                        url: '/booking',
+                        data: JSON.stringify(formData),
+                        contentType: 'application/json',
+                        success: function(response) {
+                            console.log(response);
+                            alert('予約に成功しました');
+                        },
+                        error: function(error) {
+                            console.error(error);
+                            alert('予約に失敗しました');
+                        }
+                    });
                 });
             });
         </script>
@@ -48,9 +51,16 @@
 
         <h1>信大軽音 予約フォーム</h1>
 
-        <!-- 実際にCanvasが描画されるエリア -->
         <div class="container">
             <table>
+            <tr>
+                <td class="menu">日付:</td>
+                <td><input type="date" name="day" id="day"></td>
+            </tr>
+            <tr>
+                <td class="menu">時間:</td>
+                <td><select id="time" name="time"></select></td>
+            </tr>
             <tr>
                 <td class="menu">備考：</td>
                 <td><textarea id="remark"></textarea></td>
@@ -65,6 +75,34 @@
             </tr>
             </table>
         </div>
+        <script>
+            $(document).ready(function(){
+                var today = new Date();
+                var TodayValue = formatDate(today);
+
+                var MaxDay = new Date(today);
+                MaxDay.setDate(MaxDay.getDate() + 13);
+                var MaxDayValue = formatDate(MaxDay);
+
+                $("#day").val(TodayValue);
+                $("#day").attr({
+                    "max": MaxDayValue,
+                    "min": TodayValue
+                });
+
+                $.get("/time.csv", function(data){
+                    time_list = data.split(',');
+                    for(var i = 0; i < time_list.length; i++) {
+                        $('#time').append($('<option>',{
+                            value: i,
+                            text: time_list[i]
+                        }));
+                    };
+                });
+
+                
+            });
+        </script>
     </body>
 
 </html>

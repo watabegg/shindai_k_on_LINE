@@ -1,12 +1,15 @@
 from flask import Flask, render_template, request, abort, jsonify
 from flask_bootstrap import Bootstrap
 from dotenv import load_dotenv
-import requests, os, re, json
+import requests, os, re, json, pandas
 import mysql.connector
 from mysql.connector import errorcode
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, UnfollowEvent
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import gspread
 from psycopg2 import sql
 from io import BytesIO
 from datetime import datetime
@@ -22,8 +25,13 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 # DATABASE_URL = os.environ['DATABASE_URL'] # PostgreSQLデータベースURLを取得
 RENDER_APP_NAME = "shindai_k_on_LINE" 
 
-today = datetime.today()
-time =['7:30~9:00','9:00~10:30','10:40~12:10','12:10~13:00','13:00~14:30','14:40~16:10','16:20~17:50','18:00~19:30','19:30~21:00']
+# Google Sheets APIの設定
+SPREADSHEET_ID = os.environ['SPREADSHEET_ID']
+spread_title = 'Sheet1'
+SERVICE_ACCOUNT_FILE  = './shindai-k-on-test-5123543195aa.json'
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+gc = gspread.service_account(SERVICE_ACCOUNT_FILE)
+worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(spread_title)
 
 table_name = 'reservation'
 
@@ -47,10 +55,18 @@ def get_connection():
 def hello_world():
     return render_template('index.html')
 
-@app.route('/getid.js')
+@app.route('/Source/getid.js')
 def getID():
     LIFF_ID = os.environ['LIFF_ID']
-    return render_template('getid.js', value = LIFF_ID)
+    return render_template('Source/getid.js', value = LIFF_ID)
+
+@app.route('/Source/base.js')
+def base():
+    return render_template('Source/base.js')
+
+@app.route('/time.csv')
+def csv():
+    return render_template('/time.csv')
 
 # アプリにPOSTがあったときの処理
 @app.route("/callback", methods=["POST"])
@@ -69,6 +85,8 @@ def callback():
 
 @app.route('/booking', methods=['POST'])
 def booking():
+    today = datetime.today()
+    time = pandas.read_csv("./templates/time.csv", header=None).values.tolist() # バグるかも
     data = request.json
     access_token = data['accessToken']
     
@@ -90,7 +108,7 @@ def booking():
         "messages": [
             {
                 "type": "text",
-                "text": f"予約内容\n予約者:{user_name}\n備考:{data['remark']}\n名前:{data['name']}\nパスワード:{data['password']}"
+                "text": f"予約内容\n日付:{data['day']}\n時間:{time[0][int(data['time'])]}\n予約者:{user_name}\n備考:{data['remark']}\nパスワード:{data['password']}"
             }
         ]
     }
