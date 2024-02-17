@@ -21,18 +21,19 @@
                 $('#btn-post').on('click', function(event){
                     event.preventDefault();
                     const accessToken = liff.getAccessToken();
-                    console.log(accessToken);
+                    var timestamp = getTimestamp();
 
                     var formData ={
                         'accessToken':accessToken,
+                        'timestamp':timestamp,
                         'day':$('#day').val(),
                         'time':$('#time').val(),
                         'part':$('#part').val(),
+                        'otherpart':$('input:radio[name="otherpart"]:checked').val(),
                         'regist_name':$('#regist_name').val(),
                         'remark':$('#remark').val(),
                         'password':$('input[name=password]').val()
                     };
-                    console.log(JSON.stringify(formData)); // 後で消す
                     $.ajax({
                         type: 'POST',
                         url: '/booking',
@@ -74,6 +75,13 @@
                 <td><select id="part" multiple="multiple" name="part[]" required></select></td>
             </tr>
             <tr>
+                <td class="menu">他パート参加：</td>
+                <td>
+                    <input type="radio" name="otherpart" value="1">あり
+                    <input type="radio" name="otherpart" value="0" checked>なし
+                </td>
+            </tr>
+            <tr>
                 <td class="menu">備考：</td>
                 <td><textarea id="remark"></textarea></td>
             </tr>
@@ -113,11 +121,16 @@
                 });
 
                 $.get("/part.csv", function(data){ // パート
-                    var part_list = data.split('\n');
+                    var lines = data.split('\n');
+                    var part_list = [];
+                    lines.forEach(function(line){
+                        var values = line.split(',');
+                        part_list.push(values);
+                    });
                     for(var i = 0; i < part_list[0].length; i++){
                         $('#part').append($('<option>',{
-                            value: i,
-                            text: part_list[i]
+                            value: part_list[1][i],
+                            text: part_list[0][i]
                         }))
                     };
                     $('#part').multipleSelect({
@@ -127,8 +140,8 @@
                         formatAllSelected: function() {
                             return 'バンド練習';
                         },
-                    placeholder: '使用パートを選択してください'
-                });
+                        placeholder: '使用パートを選択してください'
+                    });
                 });
 
             });

@@ -1,18 +1,16 @@
 from flask import Flask, render_template, request, abort, jsonify
-from flask_bootstrap import Bootstrap
 from dotenv import load_dotenv
-import requests, os, re, json, pandas
-import mysql.connector
-from mysql.connector import errorcode
+import requests, os, re, json, pandas, textwrap
+import mysql.connector as db
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, UnfollowEvent
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-import gspread
-from psycopg2 import sql
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
+# import psycopg2 as db
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import functions
+
+JST = timezone(timedelta(hours=+9), 'JST')
 
 load_dotenv()
 
@@ -25,18 +23,15 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 # DATABASE_URL = os.environ['DATABASE_URL'] # PostgreSQLデータベースURLを取得
 RENDER_APP_NAME = "shindai_k_on_LINE" 
 
-# Google Sheets APIの設定
-SPREADSHEET_ID = os.environ['SPREADSHEET_ID']
-spread_title = 'Sheet1'
-SERVICE_ACCOUNT_FILE  = './shindai-k-on-test-5123543195aa.json'
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-gc = gspread.service_account(SERVICE_ACCOUNT_FILE)
-worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(spread_title)
+# ローカルでのMySQL設定
+config_file = 'database_config.json'
+
+with open(config_file, 'r') as f:
+    config = json.load(f)
 
 table_name = 'reservation'
 
 app = Flask(__name__)
-bootstrap = Bootstrap(app)
 # RENDER = "https://{}.onrender.com/".format(RENDER_APP_NAME)
 
 header = {
@@ -49,7 +44,7 @@ header = {
 #     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 def get_connection():
-    return mysql.connector.connect(user = 'root',password = '',host = 'localhost', db = 'reservation')
+    return db.connect(**config)
 
 @app.route("/")
 def hello_world():
@@ -91,7 +86,6 @@ def callback():
 def booking():
     today = datetime.today()
     time = pandas.read_csv("./templates/time.csv", header=None).values.tolist() # バグるかも
-    part = pandas.read_csv("./templates/part.csv", header=None).values.tolist()
     data = request.json
     access_token = data['accessToken']
     
@@ -108,19 +102,28 @@ def booking():
     user_id = response2.json().get('userId')
     user_name = response2.json().get('displayName')
 
+    part_prd = functions.part_prd(data['part'])
+
+    part_str = functions.part_str(data['part'])
+
+    other_list = ['なし','あり']
+
     line_message = {
         "to": user_id,
         "messages": [
             {
                 "type": "text",
-                "text": f"""予約内容
-日付:{data['day']}
-時間:{time[0][int(data['time'])]}
-登録名:{data['regist_name']}
-パート:{data['part']}
-予約者:{user_name}
-備考:{data['remark']}
-パスワード:{data['password']}"""
+                "text": textwrap.dedent(f"""\
+                    予約内容
+                    タイムスタンプ:{data['timestamp']}
+                    日付:{data['day']}
+                    時間:{time[0][int(data['time'])]}
+                    登録名:{data['regist_name']}
+                    パート:{part_str}
+                    他パート参加:{other_list[int(data['otherpart'])]}
+                    予約者:{user_name}
+                    備考:{data['remark']}
+                    パスワード:{data['password']}""")
             }
         ]
     }
@@ -130,12 +133,29 @@ def booking():
         'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN
     }
 
-    response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, data=json.dumps(line_message))
-    
-    if response.status_code == 200:
-        return jsonify({"message": "予約が完了しました。"})
-    else:
-        return jsonify({"error": "予約時にエラーが発生しました。"})
+    try:
+        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, data=json.dumps(line_message))
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                table_name = 'booking'
+                sql_query = f"""
+                            INSERT INTO {table_name} (timestamp, day, time, regist_name, part, otherpart, remark, name, password)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cur.execute(sql_query, (datetime.strptime(data['timestamp'], '%Y-%m-%d %H:%M:%S'),datetime.strptime(data['day'], '%Y-%m-%d'),int(data['time']),data['regist_name'],part_prd,int(data['otherpart']),data['remark'],user_name,data['password']))
+                conn.commit()
+
+        return "予約が完了しました。"
+
+    except requests.RequestException as e:
+        print(f"リクエストエラーが発生しました:{e}")
+        return "リクエストエラーが発生しました", 500
+
+    except db.Error as e:
+        print(f"データベースエラーが発生しました:{e}")
+        return "データベースエラーが発生しました", 500
+
 
 def verifyAccessToken(AccessToken):
     return requests.get(f'https://api.line.me/oauth2/v2.1/verify?access_token={AccessToken}')
@@ -158,17 +178,26 @@ def handle_message(event):
 
 # アプリの起動
 if __name__ == "__main__":
-    # with get_connection() as conn:
-    #     with conn.cursor() as cur:
-    #         table_name = 'booking'
-    #         sql_query = """
-    #             CREATE TABLE IF NOT EXISTS %s 
-    #             (timestamp TIMESTAMP, day DATE, time INT, regist_name CHAR, 
-    #             part INT, otherpart TINYINT, remark TEXT, name CHAR, password LONGTEXT, delate TINYINT)
-    #         """
-    #         cur.execute(sql_query, table_name)
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                table_name = 'booking'
+                sql_query = f"""
+                    CREATE TABLE IF NOT EXISTS {table_name} 
+                    (
+                        timestamp TIMESTAMP, day DATE, time INT, regist_name CHAR, 
+                        part INT, otherpart TINYINT, remark TEXT, name CHAR, password LONGTEXT, delate TINYINT
+                    ) DEFAULT CHARSET=utf8
+                """
+                cur.execute(sql_query)
 
-    #         conn.commit()
+                conn.commit()
+    except db.Error as e:
+        print(f'エラーが発生しました:{e}')
+    
+    finally:
+        if conn.is_connected():
+            conn.close()
     
     app.run(debug=True)
 ### End

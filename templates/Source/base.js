@@ -10,3 +10,18 @@ function parseCsv(data) {
     var time_list = $.csv.toArrays(data);
     return time_list
 }
+
+function getTimestamp() {
+    var date = new Date();
+    var year = date.getFullYear();
+    var month = padZero(date.getMonth() + 1);
+    var day = padZero(date.getDate());
+    var hours = padZero(date.getHours());
+    var minutes = padZero(date.getMinutes());
+    var seconds = padZero(date.getSeconds());
+    return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+}
+
+function padZero(num) {
+    return (num < 10 ? '0' : '') + num;
+}
