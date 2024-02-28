@@ -14,7 +14,10 @@ def part_str(data): # パートの配列を日本語に直す関数
     
 def part_prd(data):
     part_prd = 1
-    for num in data:
-        part_prd *= int(num)
+    try:
+        for num in data:
+            part_prd *= int(num)
+    except ValueError as e:
+        return f'パート入力エラー:{e}', 500
 
     return part_prd

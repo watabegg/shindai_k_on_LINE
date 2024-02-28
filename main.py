@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, abort, jsonify
 from dotenv import load_dotenv
-import requests, os, re, json, pandas, textwrap
+import requests, os, re, json, pandas, textwrap, itertools
 import mysql.connector as db
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -59,6 +59,10 @@ def getID():
 def base():
     return render_template('Source/base.js')
 
+@app.route('/Source/sha256.js')
+def sha256():
+    return render_template('Source/sha256.js')
+
 @app.route('/time.csv')
 def csv():
     return render_template('/time.csv')
@@ -66,6 +70,27 @@ def csv():
 @app.route('/part.csv')
 def part():
     return render_template('/part.csv')
+
+@app.route('/get_time')
+def get_time():
+    select_day = request.args.get('day_select')
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor(buffered=True) as cur:
+                sql_query = f"""
+                            SELECT time FROM booking WHERE day = '{select_day}'
+                """
+                cur.execute(sql_query)
+                
+                time_list = cur.fetchall()
+
+        print(time_list)
+        return jsonify({'time_list': list(itertools.chain.from_iterable(time_list))})
+
+    except db.Error as e:
+        print(f"データベースエラーが発生しました:{e}")
+        return "データベースエラーが発生しました", 500
 
 # アプリにPOSTがあったときの処理
 @app.route("/callback", methods=["POST"])

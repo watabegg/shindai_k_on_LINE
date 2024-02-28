@@ -6,6 +6,7 @@
         <title>信大軽音コマ取り</title>
         <script src="./Source/getid.js"></script>
         <script src="./Source/base.js"></script>
+        <script src="./Source/sha256.js"></script>
         <link href="https://unpkg.com/multiple-select@1.7.0/dist/multiple-select.min.css" rel="stylesheet">
         <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
         <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
@@ -19,34 +20,44 @@
                     liffId: LIFF_ID
                 });
                 $('#btn-post').on('click', function(event){
-                    event.preventDefault();
-                    const accessToken = liff.getAccessToken();
-                    var timestamp = getTimestamp();
+                    $("input[required]:invalid").each(function () {
+                        $(this).css("background-color", "red"); // ここ改良
+                        event.preventDefault(); 
+                        alert("必須フィールドを入力してください。");
+                    });
 
-                    var formData ={
-                        'accessToken':accessToken,
-                        'timestamp':timestamp,
-                        'day':$('#day').val(),
-                        'time':$('#time').val(),
-                        'part':$('#part').val(),
-                        'otherpart':$('input:radio[name="otherpart"]:checked').val(),
-                        'regist_name':$('#regist_name').val(),
-                        'remark':$('#remark').val(),
-                        'password':$('input[name=password]').val()
-                    };
-                    $.ajax({
-                        type: 'POST',
-                        url: '/booking',
-                        data: JSON.stringify(formData),
-                        contentType: 'application/json',
-                        success: function(response) {
-                            console.log(response);
-                            alert('予約に成功しました');
-                        },
-                        error: function(error) {
-                            console.error(error);
-                            alert('予約に失敗しました');
-                        }
+                    $("input[required]:valid").each(function () {
+                        $(this).css("background-color", "white");
+                        event.preventDefault();
+                        const accessToken = liff.getAccessToken();
+                        var timestamp = getTimestamp();
+                        var pass = $('input[name=password]').val();
+
+                        var formData ={
+                            'accessToken':accessToken,
+                            'timestamp':timestamp,
+                            'day':$('#day').val(),
+                            'time':$('#time').val(),
+                            'part':$('#part').val(),
+                            'otherpart':$('input:radio[name="otherpart"]:checked').val(),
+                            'regist_name':$('#regist_name').val(),
+                            'remark':$('#remark').val(),
+                            'password':hex_sha256(pass)
+                        };
+                        $.ajax({
+                            type: 'POST',
+                            url: '/booking',
+                            data: JSON.stringify(formData),
+                            contentType: 'application/json',
+                            success: function(response) {
+                                console.log(response);
+                                alert('予約に成功しました');
+                            },
+                            error: function(error) {
+                                console.error(error);
+                                alert('予約に失敗しました');
+                            }
+                        });
                     });
                 });
             });
@@ -64,7 +75,9 @@
             </tr>
             <tr>
                 <td class="menu">時間:</td>
-                <td><select id="time" name="time" required></select></td>
+                <td><select id="time" name="time" required>
+                    <option hidden>選択して下さい</option>
+                </select></td>
             </tr>
             <tr>
                 <td class="menu">登録名：</td>
@@ -104,7 +117,7 @@
                 MaxDay.setDate(MaxDay.getDate() + 13);
                 var MaxDayValue = formatDate(MaxDay);
 
-                $("#day").val(TodayValue); // 日付
+                // $("#day").val(TodayValue); // 日付
                 $("#day").attr({
                     "max": MaxDayValue,
                     "min": TodayValue
@@ -141,6 +154,25 @@
                             return 'バンド練習';
                         },
                         placeholder: '使用パートを選択してください'
+                    });
+                });
+
+                $('#day').on('input', function(){ // 日付の選択から選択できる時間を動的に変更
+                    var day_select = $(this).val();
+                    $('#time>option').prop("disabled", false); // disabledのリセット
+
+                    $.ajax({
+                        url: '/get_time',
+                        method: 'GET',
+                        data: {'day_select': day_select},
+                        success: function(response) {
+                            response.time_list.forEach(function(times){
+                                $('#time>option').eq(times).prop("disabled", true);
+                            });
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error:', error);
+                        }
                     });
                 });
 
