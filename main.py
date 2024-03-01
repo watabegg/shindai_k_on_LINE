@@ -71,7 +71,8 @@ def csv():
 def part():
     return render_template('/part.csv')
 
-@app.route('/get_time')
+# 日付選択からコマの制限を出力
+@app.route('/get_time', methods=["GET"])
 def get_time():
     select_day = request.args.get('day_select')
 
@@ -87,6 +88,30 @@ def get_time():
 
         print(time_list)
         return jsonify({'time_list': list(itertools.chain.from_iterable(time_list))})
+
+    except db.Error as e:
+        print(f"データベースエラーが発生しました:{e}")
+        return "データベースエラーが発生しました", 500
+    
+# 日時選択からパートの制限を出力
+@app.route('/get_part', methods=["GET"])
+def get_part():
+    select_day = request.args.get('day_select')
+    select_time = request.args.get('time_select')
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor(buffered=True) as cur:
+                sql_query = f"""
+                            SELECT part FROM booking WHERE day = '{select_day}' AND time = '{select_time}'
+                """
+                cur.execute(sql_query)
+                
+                comp_list = cur.fetchall()
+
+        part_list = functions.part_prime(comp_list)
+        print(part_list)
+        return jsonify({'part_list': part_list})
 
     except db.Error as e:
         print(f"データベースエラーが発生しました:{e}")

@@ -1,4 +1,4 @@
-import pandas
+import pandas, itertools
 
 def part_str(data): # パートの配列を日本語に直す関数
     part = pandas.read_csv("./templates/part.csv", header=None).values.tolist()
@@ -21,3 +21,14 @@ def part_prd(data):
         return f'パート入力エラー:{e}', 500
 
     return part_prd
+
+def part_prime(comp_list): # SQLからfetchした生の二次元パート配列を因数分解して一次元にして返す
+    part = pandas.read_csv("./templates/part.csv", header=None).values.tolist()
+    reserved_part = []
+    for i in comp_list:
+        for j in part[1]:
+            if i[0] % j == 0:
+                reserved_part.append(j)
+    
+    result = [0 if x in reserved_part else x for x in part[1]]
+    return result

@@ -175,6 +175,27 @@
                         }
                     });
                 });
+                $('#time').on('input', function(){ // 日付の選択から選択できる時間を動的に変更
+                    var day_select = $("#day").val();
+                    var time_select = $(this).val();
+                    $('#part>option').prop("disabled", false); // disabledのリセット
+
+                    $.ajax({
+                        url: '/get_part',
+                        method: 'GET',
+                        data: {'day_select': day_select,
+                               'time_select': time_select
+                            },
+                        success: function(response) {
+                            response.part_list.forEach(function(times){
+                                $('#time>option').eq(times).prop("disabled", true);
+                            });
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error:', error);
+                        }
+                    });
+                });
 
             });
         </script>
